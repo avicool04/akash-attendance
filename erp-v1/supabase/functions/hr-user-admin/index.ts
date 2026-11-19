@@ -101,15 +101,33 @@ Deno.serve(async (req: Request) => {
     return { baseLocationId, managerId }
   }
 
+  async function nextEmployeeCode() {
+    const { data, error } = await admin.from('profiles').select('employee_code')
+    if (error) throw error
+    const used = new Set((data ?? []).map(p => normalizeCode(p.employee_code)).filter(code => /^AE\d{4,}$/.test(code)))
+    let number = 3
+    while (used.has(`AE${String(number).padStart(4, '0')}`)) number++
+    return `AE${String(number).padStart(4, '0')}`
+  }
+
   async function saveEmployee(row: Record<string, unknown>) {
     const action = String(row.action ?? 'create').toLowerCase()
-    const code = normalizeCode(row.employee_code)
-    if (!validCode(code)) throw new Error('User ID must use 1–64 letters, numbers, dots, underscores or hyphens.')
+    let code = normalizeCode(row.employee_code)
     const firstName = String(row.first_name ?? '').trim()
     const lastName = String(row.last_name ?? '').trim()
     if (!firstName || !lastName) throw new Error('First Name and Last Name are required.')
     const designation = String(row.designation ?? '').trim() || null
     const role = String(row.role ?? 'employee')
+    if (action === 'create') {
+      if (role === 'proprietor') code = code || 'AE0001'
+      else if (role === 'hr_manager') code = code || 'AE0002'
+      else if (role === 'employee' || role === 'site_manager') {
+        if (code) throw new Error('Employee IDs are assigned automatically. Leave the User ID blank.')
+        code = await nextEmployeeCode()
+      }
+    }
+    if (!code) throw new Error(action === 'update' ? 'Enter the existing User ID to update.' : 'A User ID could not be assigned.')
+    if (!validCode(code)) throw new Error('User ID must use 1–64 letters, numbers, dots, underscores or hyphens.')
     if (!mayGrantRole(role)) throw new Error('Your account cannot assign that access role.')
     validateAccountCode(code, role)
     const { data: existing, error: existingError } = await admin.from('profiles').select('id,role,status').eq('employee_code', code).maybeSingle()
