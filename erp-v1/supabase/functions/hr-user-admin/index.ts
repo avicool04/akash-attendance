@@ -37,15 +37,40 @@ Deno.serve(async (req: Request) => {
   const { data: authData, error: authError } = await userClient.auth.getUser()
   if (authError || !authData.user) return json({ error: 'Your sign-in has expired. Sign in again.' }, 401)
   const admin = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } })
-  const { data: caller, error: callerError } = await admin.from('profiles').select('id,role,status').eq('id', authData.user.id).maybeSingle()
-  if (callerError || !caller || caller.status !== 'active' || !['hr_manager', 'technical_super_admin'].includes(caller.role)) {
-    return json({ error: 'Only an active HR Manager or Administrator can manage user accounts.' }, 403)
+  const { data: caller, error: callerError } = await admin.from('profiles').select('id,role,status,employee_code,must_change_password').eq('id', authData.user.id).maybeSingle()
+  if (callerError || !caller || caller.status !== 'active') return json({ error: 'Your active employee profile is required.' }, 403)
+
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return json({ error: 'Request body must be valid JSON.' }, 400) }
+
+  if (body.action === 'complete_password_setup') {
+    if (!caller.must_change_password) return json({ error: 'No password change is pending.' }, 403)
+    const newPassword = String(body.new_password ?? '')
+    if (newPassword.length < 8) return json({ error: 'Choose a password with at least 8 characters.' }, 400)
+    const { error: passwordError } = await admin.auth.admin.updateUserById(authData.user.id, { password: newPassword })
+    if (passwordError) return json({ error: passwordError.message }, 400)
+    const { error: profileError } = await admin.from('profiles').update({ must_change_password: false }).eq('id', authData.user.id).eq('must_change_password', true)
+    if (profileError) return json({ error: 'Password changed, but setup could not be completed. Contact HR or the developer.' }, 500)
+    return json({ success: true })
   }
 
+  if (!['hr_manager', 'technical_super_admin'].includes(caller.role)) return json({ error: 'Only an active HR Manager or Developer can manage user accounts.' }, 403)
+
   const mayGrantRole = (role: string) => {
-    if (!['employee', 'site_manager', 'hr_manager'].includes(role)) return false
-    if (role === 'hr_manager') return caller.role === 'technical_super_admin'
+    if (!['employee', 'site_manager', 'hr_manager', 'proprietor'].includes(role)) return false
+    if (role === 'hr_manager' || role === 'proprietor') return caller.role === 'technical_super_admin'
     return true
+  }
+
+  function validateAccountCode(code: string, role: string) {
+    if (role === 'proprietor' && code !== 'AE0001') throw new Error('The Proprietor & Founder account must use User ID AE0001.')
+    if (code === 'AE0001' && role !== 'proprietor') throw new Error('AE0001 is reserved for the Proprietor & Founder.')
+    if (role === 'hr_manager' && code !== 'AE0002') throw new Error('The HR account must use User ID AE0002.')
+    if (code === 'AE0002' && role !== 'hr_manager') throw new Error('AE0002 is reserved for HR.')
+    if (role === 'employee' || role === 'site_manager') {
+      const sequence = /^AE(\d{4,})$/.exec(code)
+      if (!sequence || Number(sequence[1]) < 3) throw new Error('Employee and Site Manager User IDs must start at AE0003.')
+    }
   }
 
   async function resolveAssignments(row: Record<string, unknown>, creating: boolean) {
@@ -86,30 +111,25 @@ Deno.serve(async (req: Request) => {
     const designation = String(row.designation ?? '').trim() || null
     const role = String(row.role ?? 'employee')
     if (!mayGrantRole(role)) throw new Error('Your account cannot assign that access role.')
-    const password = String(row.password ?? '')
+    validateAccountCode(code, role)
     const { data: existing, error: existingError } = await admin.from('profiles').select('id,role,status').eq('employee_code', code).maybeSingle()
     if (existingError) throw existingError
 
     if (action === 'update') {
       if (!existing) throw new Error('No existing employee has this User ID.')
       await resolveAssignments(row, false)
-      if (password && password.length < 8) throw new Error('A supplied password must be at least 8 characters.')
       const patch: Record<string, unknown> = { first_name: firstName, last_name: lastName, full_name: `${firstName} ${lastName}`, designation, role }
       const { error } = await admin.from('profiles').update(patch).eq('id', existing.id)
       if (error) throw error
-      if (password) {
-        const { error: passwordError } = await admin.auth.admin.updateUserById(existing.id, { password })
-        if (passwordError) throw passwordError
-      }
       return { success: true, user_id: code }
     }
     if (action !== 'create') throw new Error('Action must be Create or Update.')
     if (existing) throw new Error('This User ID already exists. Use Update to change permitted details.')
-    if (password.length < 8) throw new Error('Initial password must be at least 8 characters.')
+    const initialPassword = code
     const { baseLocationId, managerId } = await resolveAssignments(row, true)
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email: syntheticEmail(code),
-      password,
+      password: initialPassword,
       email_confirm: true,
       user_metadata: { employee_code: code },
     })
@@ -125,13 +145,28 @@ Deno.serve(async (req: Request) => {
       reporting_manager_id: managerId,
       role,
       status: 'active',
+      must_change_password: true,
     }
     const { error: profileError } = await admin.from('profiles').insert(profile)
     if (profileError) {
       await admin.auth.admin.deleteUser(created.user.id)
       throw profileError
     }
-    return { success: true, user_id: code }
+    return { success: true, user_id: code, must_change_password: true }
+  }
+
+  async function resetPassword(userId: string) {
+    if (!userId || userId === authData.user!.id) throw new Error('Choose another account to reset.')
+    const { data: target, error } = await admin.from('profiles').select('id,employee_code,role,status').eq('id', userId).maybeSingle()
+    if (error || !target || !target.employee_code) throw new Error('Employee account was not found.')
+    if (caller.role !== 'technical_super_admin' && ['hr_manager', 'technical_super_admin', 'proprietor'].includes(target.role)) throw new Error('Only the Developer can reset the password of HR, the Proprietor & Founder, or another Developer.')
+    const { error: flagError } = await admin.from('profiles').update({ must_change_password: true }).eq('id', target.id)
+    if (flagError) throw flagError
+    const { error: passwordError } = await admin.auth.admin.updateUserById(target.id, { password: target.employee_code })
+    if (passwordError) { await admin.from('profiles').update({ must_change_password: false }).eq('id', target.id); throw passwordError }
+    const { error: revokeError } = await admin.rpc('revoke_account_sessions', { p_user_id: target.id })
+    if (revokeError) throw new Error('Password reset; the next sign-in will require a new password, but existing sessions could not be revoked.')
+    return { success: true, user_id: target.employee_code, must_change_password: true }
   }
 
   async function setAccess(userId: string, active: boolean) {
@@ -164,8 +199,6 @@ Deno.serve(async (req: Request) => {
     return { success: true }
   }
 
-  let body: Record<string, unknown>
-  try { body = await req.json() } catch { return json({ error: 'Request body must be valid JSON.' }, 400) }
   try {
     if (body.action === 'create' || body.action === 'update') return json(await saveEmployee({ ...(body.employee as Record<string, unknown>), action: body.action }))
     if (body.action === 'bulk') {
@@ -178,6 +211,7 @@ Deno.serve(async (req: Request) => {
       }
       return json({ success: results.some(x => x.success), results })
     }
+    if (body.action === 'reset_password') return json(await resetPassword(String(body.user_id ?? '')))
     if (body.action === 'deactivate' || body.action === 'activate') return json(await setAccess(String(body.user_id ?? ''), body.action === 'activate'))
     return json({ error: 'Unsupported account action.' }, 400)
   } catch (error) {
