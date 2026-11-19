@@ -1,0 +1,6 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(self), camera=(self)
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; connect-src 'self' https://nyhayizvnkzjirhhmbzh.supabase.co https://nominatim.openstreetmap.org; img-src 'self' data: blob: https://nyhayizvnkzjirhhmbzh.supabase.co https://tile.openstreetmap.org; font-src 'self' data:; base-uri 'self'; frame-ancestors 'none'
