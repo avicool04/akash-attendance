@@ -1,0 +1,9 @@
+.report-columns{margin:4px 0 20px;padding:14px;border:1px solid var(--line);border-radius:11px;background:#fbfcfb}
+.report-columns summary{font-weight:700;color:#33463c;cursor:pointer}
+.column-checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:9px 15px;padding:14px 0}
+.column-checks label{font-size:13px;color:#405249;display:flex;align-items:center;gap:7px}
+.column-checks input{accent-color:var(--green);width:15px;height:15px}
+.report-columns .inline-form{grid-template-columns:minmax(150px,1fr) auto minmax(150px,1fr) auto;margin:6px 0 10px}
+.report-columns .hint{margin-top:5px}
+@media(max-width:720px){.report-columns .inline-form{grid-template-columns:1fr 1fr}.report-columns .inline-form input{grid-column:1 / -1}}
+
