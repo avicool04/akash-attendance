@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase, toAuthEmail, toLegacyAuthEmail } from '@/lib/supabase';
 
@@ -14,10 +14,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     let alive = true;
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!alive) return;
-      if (session) router.replace('/admin');
-      else setChecking(false);
+      if (!session) { setChecking(false); return; }
+      const { data: profile } = await supabase.from('profiles').select('role,status,must_change_password').eq('id', session.user.id).maybeSingle();
+      if (!alive) return;
+      if (!profile || profile.status !== 'active') { await supabase.auth.signOut(); setChecking(false); return; }
+      if (profile.must_change_password) router.replace('/change-password');
+      else if (['hr_manager','technical_super_admin','proprietor'].includes(profile.role)) router.replace('/admin');
+      else if (['employee','site_manager'].includes(profile.role)) router.replace('/employee');
+      else { await supabase.auth.signOut(); setChecking(false); }
     });
     return () => { alive = false; };
   }, [router]);
