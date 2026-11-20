@@ -117,8 +117,8 @@ export default function AdminPage() {
   async function saveLocation(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('');
     const latitude = Number(form.latitude), longitude = Number(form.longitude);
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-      setError('Enter valid latitude and longitude coordinates.'); setSaving(false); return;
+    if (!form.latitude || !form.longitude || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      setError('Select a location on the map before saving.'); setSaving(false); return;
     }
     const payload = {
       name: form.name.trim(), location_type: form.location_type, address: form.address.trim() || null,
