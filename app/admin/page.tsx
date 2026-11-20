@@ -21,6 +21,7 @@ const blankForm: FormState = { name: '', location_type: 'site', address: '', lat
 export default function AdminPage() {
   const router = useRouter();
   const [userName, setUserName] = useState('HR Team');
+  const [canManage, setCanManage] = useState(false);
   const [userId, setUserId] = useState('');
   const [locations, setLocations] = useState<Location[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -40,9 +41,10 @@ export default function AdminPage() {
     const { data: profile, error: profileError } = await supabase
       .from('profiles').select('full_name,role,status').eq('id', authData.user.id).single();
     if (profileError || !profile || profile.status !== 'active') { await supabase.auth.signOut(); router.replace('/'); return; }
-    if (!['hr_manager', 'technical_super_admin'].includes(profile.role)) { router.replace(profile.role === 'employee' || profile.role === 'site_manager' ? '/employee' : '/'); return; }
+    if (!['hr_manager', 'technical_super_admin', 'proprietor'].includes(profile.role)) { router.replace(profile.role === 'employee' || profile.role === 'site_manager' ? '/employee' : '/'); return; }
     setUserId(authData.user.id);
     setUserName(profile.full_name || 'HR Team');
+    setCanManage(['hr_manager', 'technical_super_admin'].includes(profile.role));
 
     const [locRes, empRes] = await Promise.all([
       supabase.from('work_locations')
@@ -154,7 +156,7 @@ export default function AdminPage() {
         <div className="sidebar-bottom">
           <div className="user-mini">
             <div className="avatar">{userName.split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase()}</div>
-            <div><div className="user-mini-name">{userName}</div><div className="user-mini-role">HR Administrator</div></div>
+            <div><div className="user-mini-name">{userName}</div><div className="user-mini-role">{canManage ? 'HR Administrator' : 'Company Owner'}</div></div>
           </div>
           <button className="button button-secondary" style={{ width: '100%', marginTop: 17, background: '#20392d', borderColor: '#385343', color: '#dcebe1' }} onClick={async () => { await supabase.auth.signOut(); router.replace('/'); }}>↪ &nbsp; Sign out</button>
         </div>
@@ -170,7 +172,7 @@ export default function AdminPage() {
         <div className="content">
           <div className="page-heading">
             <div><div className="eyebrow">HR CONTROL CENTRE</div><h1>Good day, {userName.split(' ')[0]}.</h1><p>Manage your workforce, offices and project locations from one place.</p></div>
-            <button className="button button-primary" onClick={() => { resetForm(); document.getElementById('location-form')?.scrollIntoView({ behavior: 'smooth' }); }}>＋ Add location</button>
+            {canManage && <button className="button button-primary" onClick={() => { resetForm(); document.getElementById('location-form')?.scrollIntoView({ behavior: 'smooth' }); }}>＋ Add location</button>}
           </div>
 
           {error && <div className="notice notice-error">{error}</div>}
@@ -201,14 +203,14 @@ export default function AdminPage() {
                       <span className={'pill ' + (location.location_type === 'office' ? 'pill-office' : 'pill-site')}>{location.location_type === 'office' ? 'Office' : 'Site'}</span>
                       <span className={'pill ' + (location.is_active ? 'pill-active' : 'pill-inactive')}>{location.is_active ? 'Active' : 'Inactive'}</span>
                       <span className="count-text">{count} staff</span>
-                      <button className="button button-quiet" onClick={() => startEdit(location)}>Edit</button>
-                      <button className="button button-quiet" onClick={() => void toggleLocation(location)}>{location.is_active ? 'Deactivate' : 'Activate'}</button>
+                      {canManage && <><button className="button button-quiet" onClick={() => startEdit(location)}>Edit</button>
+                      <button className="button button-quiet" onClick={() => void toggleLocation(location)}>{location.is_active ? 'Deactivate' : 'Activate'}</button></>}
                     </div>
                   </div>;
                 })}</div>}
             </div>
 
-            <div className="panel" id="location-form">
+            {canManage && <div className="panel" id="location-form">
               <div className="panel-head"><div><h2 className="panel-title">{editingId ? 'Edit location' : 'Add a location'}</h2><p className="panel-subtitle">Register an office or a project site</p></div><span className="stat-icon">＋</span></div>
               <div className="panel-body">
                 <form onSubmit={saveLocation}>
@@ -225,10 +227,10 @@ export default function AdminPage() {
                   <div className="form-actions"><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editingId ? 'Save changes' : 'Create location'}</button>{editingId && <button className="button button-secondary" type="button" onClick={resetForm}>Cancel</button>}</div>
                 </form>
               </div>
-            </div>
+            </div>}
           </section>
 
-          <section className="panel assign-panel" id="assignments">
+          {canManage && <section className="panel assign-panel" id="assignments">
             <div className="panel-head"><div><h2 className="panel-title">Employee location assignment</h2><p className="panel-subtitle">Set or change each employee's designated base location</p></div><span className="pill pill-active">{assignedCount} assigned</span></div>
             <div className="panel-body">
               <form className="assign-controls" onSubmit={assignLocation}>
@@ -251,7 +253,7 @@ export default function AdminPage() {
                 {employees.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: '#89968e', padding: 24 }}>No employees are available to assign yet.</td></tr>}
               </tbody></table>
             </div>
-          </section>
+          </section>}
         </div>
       </main>
     </div>
