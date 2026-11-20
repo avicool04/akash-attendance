@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase, toAuthEmail } from '@/lib/supabase';
+import { supabase, toAuthEmail, toLegacyAuthEmail } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,10 +26,18 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
+    let { data, error: authError } = await supabase.auth.signInWithPassword({
       email: toAuthEmail(userId),
       password,
     });
+    if (authError) {
+      const fallback = await supabase.auth.signInWithPassword({
+        email: toLegacyAuthEmail(userId),
+        password,
+      });
+      data = fallback.data;
+      authError = fallback.error;
+    }
     if (authError || !data.user) {
       setError(authError?.message || 'Unable to sign in. Check your credentials.');
       setLoading(false);
