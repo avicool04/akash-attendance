@@ -28,7 +28,7 @@ export default function ChangePasswordPage() {
   }
 
   return <main className="login-form-side" style={{ minHeight: '100vh' }}><div className="login-card">
-    <div className="login-brand"><div className="brand-mark">A</div><div><div className="brand-name" style={{ color: '#183629' }}>Akash Enterprises</div><div className="brand-sub" style={{ color: '#87958b' }}>Account security</div></div></div>
+    <div className="login-brand"><div><div className="brand-name">Akash Enterprises</div><div className="brand-sub">Account security</div></div></div>
     <div className="eyebrow">ONE-TIME SETUP</div><h1>Update your password</h1><p className="intro">Choose a new password before continuing to your workspace.</p>
     <form onSubmit={submit}>
       <div className="field"><label htmlFor="newPassword">New password</label><input id="newPassword" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required /></div>
