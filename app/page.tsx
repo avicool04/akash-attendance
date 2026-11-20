@@ -81,7 +81,6 @@ export default function LoginPage() {
     <main className="login-page">
       <section className="login-visual">
         <div className="brand">
-          <div className="brand-mark">A</div>
           <div><div className="brand-name">AKASH ENTERPRISES</div><div className="brand-sub">People & operations</div></div>
         </div>
         <div className="login-visual-content">
@@ -97,8 +96,7 @@ export default function LoginPage() {
       <section className="login-form-side">
         <div className="login-card">
           <div className="login-brand">
-            <div className="brand-mark">A</div>
-            <div><div className="brand-name" style={{ color: '#183629' }}>Akash Enterprises</div><div className="brand-sub" style={{ color: '#87958b' }}>Attendance portal</div></div>
+            <div><div className="brand-name">Akash Enterprises</div><div className="brand-sub">Attendance portal</div></div>
           </div>
           <div className="eyebrow">WELCOME BACK</div>
           <h1>Sign in to your account</h1>
