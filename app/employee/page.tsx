@@ -20,13 +20,13 @@ export default function EmployeePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.replace('/'); return; }
       const { data: profile, error } = await supabase.from('profiles')
-        .select('full_name,employee_code,designation,base_location_id,status,role')
+        .select('full_name,first_name,middle_name,last_name,employee_code,designation,base_location_id,status,role')
         .eq('id', user.id).single();
       if (error || !profile || profile.status !== 'active' || !['employee','site_manager'].includes(profile.role)) {
         await supabase.auth.signOut(); router.replace('/'); return;
       }
       if (!active) return;
-      setName(profile.full_name || 'Employee');
+      setName([profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ') || profile.full_name || 'Employee');
       setCode(profile.employee_code || '');
       setDesignation(profile.designation || (profile.role === 'site_manager' ? 'Site Manager' : 'Team member'));
       if (profile.base_location_id) {
@@ -54,9 +54,9 @@ export default function EmployeePage() {
         </div>
       </aside>
       <main className="main-area">
-        <header className="topbar"><div className="mobile-brand"><div className="brand-mark" style={{ width: 32, height: 32, borderRadius: 10 }}>A</div><strong style={{ font: '800 12px Manrope' }}>AKASH ENTERPRISES</strong></div><div className="crumb">My workspace <span style={{ color: '#bdc7c0', margin: '0 8px' }}>/</span> Overview</div><div className="topbar-right"><span className="top-date">{new Intl.DateTimeFormat('en-IN',{dateStyle:'full'}).format(new Date())}</span><div className="icon-circle">♙</div></div></header>
+        <header className="topbar"><div className="mobile-brand"><div className="brand-mark" style={{ width: 32, height: 32, borderRadius: 10 }}>A</div><strong style={{ font: '800 12px Manrope' }}>AKASH ENTERPRISES</strong></div><div className="crumb">My workspace <span style={{ color: '#bdc7c0', margin: '0 8px' }}>/</span> Overview</div><div className="topbar-right"><span className="top-date">{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium'}).format(new Date())}</span><button className="button button-secondary top-logout" onClick={async () => { await supabase.auth.signOut(); router.replace('/'); router.refresh(); }}>Log out ↗</button></div></header>
         <div className="content">
-          <div className="page-heading"><div><div className="eyebrow">EMPLOYEE WORKSPACE</div><h1>Hello, {name.split(' ')[0]}.</h1><p>Your assigned work location and employee details.</p></div><span className="pill pill-active">Account active</span></div>
+          <div className="page-heading"><div><div className="eyebrow">EMPLOYEE WORKSPACE</div><h1>My workspace</h1><p>Your assigned work location and employee details.</p></div><span className="pill pill-active">Account active</span></div>
           <section className="stats-grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))' }}>
             <div className="stat-card"><div className="stat-top">Employee ID <span className="stat-icon">♙</span></div><div className="stat-value" style={{ fontSize: 22 }}>{code || '—'}</div><div className="stat-foot">{designation}</div></div>
             <div className="stat-card"><div className="stat-top">Assigned location <span className="stat-icon">⌖</span></div><div className="stat-value" style={{ fontSize: 22 }}>{location?.name || 'Not assigned'}</div><div className="stat-foot">{location ? (location.location_type === 'office' ? 'Office' : 'Project site') : 'Please contact HR to get a location assigned'}</div></div>
