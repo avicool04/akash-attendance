@@ -158,7 +158,6 @@ export default function AdminPage() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">A</div>
           <div><div className="brand-name">AKASH ENTERPRISES</div><div className="brand-sub">Workforce portal</div></div>
         </div>
         <div className="nav-label">WORKSPACE</div>
@@ -179,7 +178,7 @@ export default function AdminPage() {
 
       <main className="main-area">
         <header className="topbar">
-          <div className="mobile-brand"><div className="brand-mark" style={{ width: 32, height: 32, borderRadius: 10 }}>A</div><strong style={{ font: '800 12px Manrope' }}>AKASH ENTERPRISES</strong></div>
+          <div className="mobile-brand"><strong style={{ font: '800 12px Manrope' }}>AKASH ENTERPRISES</strong></div>
           <div className="crumb">Workspace <span style={{ color: '#bdc7c0', margin: '0 8px' }}>/</span> HR overview</div>
           <div className="topbar-right"><span className="top-date">{new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date())}</span><button className="button button-secondary top-logout" onClick={async () => { await supabase.auth.signOut(); router.replace('/'); router.refresh(); }}>Log out ↗</button></div>
         </header>
