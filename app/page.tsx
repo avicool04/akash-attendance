@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase, toAuthEmail } from '@/lib/supabase';
 
@@ -9,122 +9,93 @@ export default function LoginPage() {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [checking, setChecking] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
+    let alive = true;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        checkRoleAndRedirect(session.user.id);
-      } else {
-        setChecking(false);
-      }
+      if (!alive) return;
+      if (session) router.replace('/admin');
+      else setChecking(false);
     });
-  }, []);
+    return () => { alive = false; };
+  }, [router]);
 
-  async function checkRoleAndRedirect(uid: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', uid)
-      .single();
-
-    if (data?.role === 'admin') {
-      router.replace('/admin');
-    } else {
-      router.replace('/employee');
-    }
-  }
-
-  async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    try {
-      const email = toAuthEmail(userId);
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) {
-        setError(authError.message || 'Invalid User ID or Password');
-        setLoading(false);
-        return;
-      }
-
-      if (data.user) {
-        await checkRoleAndRedirect(data.user.id);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: toAuthEmail(userId),
+      password,
+    });
+    if (authError || !data.user) {
+      setError(authError?.message || 'Unable to sign in. Check your credentials.');
       setLoading(false);
+      return;
     }
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role,status,must_change_password')
+      .eq('id', data.user.id)
+      .single();
+    if (profileError || !profile || profile.status !== 'active') {
+      await supabase.auth.signOut();
+      setError('Your account is inactive or is not configured. Please contact HR.');
+      setLoading(false);
+      return;
+    }
+    if (profile.must_change_password) {
+      router.replace('/change-password');
+      return;
+    }
+    router.replace(profile.role === 'employee' || profile.role === 'site_manager' ? '/employee' : '/admin');
   }
 
-  if (checking) {
-    return (
-      <div className="container" style={{ paddingTop: '4rem', textAlign: 'center' }}>
-        <p className="muted">Loading…</p>
-      </div>
-    );
-  }
+  if (checking) return <div className="loading-screen">Preparing your workspace…</div>;
 
   return (
-    <div>
-      <header className="header">
-        <div className="logo">
-          <img src="/logo.png" alt="Akash Enterprises" style={{ height: 40, width: 'auto' }} />
-          <div>
-            <strong>Akash Enterprises</strong>
-            <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>Attendance System</div>
-          </div>
+    <main className="login-page">
+      <section className="login-visual">
+        <div className="brand">
+          <div className="brand-mark">A</div>
+          <div><div className="brand-name">AKASH ENTERPRISES</div><div className="brand-sub">People & operations</div></div>
         </div>
-      </header>
-
-      <div className="container" style={{ paddingTop: '2rem' }}>
-        <div className="card">
-          <h1 style={{ fontSize: '1.35rem', marginBottom: '0.25rem' }}>Sign In</h1>
-          <p className="muted mb-2">Enter your User ID and Password</p>
-
+        <div className="login-visual-content">
+          <div className="eyebrow" style={{ color: '#b9e8c9' }}>WORKFORCE MANAGEMENT</div>
+          <h2>Every site.<br />Every shift.<br /><span style={{ color: '#a8e2bd' }}>In sync.</span></h2>
+          <p>A clearer view of your teams, work locations and daily attendance — all in one place.</p>
+          <div className="login-feature"><span>⌖</span> Location-aware attendance</div>
+          <div className="login-feature"><span>◷</span> Simple check-in and check-out</div>
+          <div className="login-feature"><span>▤</span> Centralised workforce records</div>
+        </div>
+        <div className="login-footer">AKASH ENTERPRISES · INTERNAL WORKSPACE</div>
+      </section>
+      <section className="login-form-side">
+        <div className="login-card">
+          <div className="login-brand">
+            <div className="brand-mark">A</div>
+            <div><div className="brand-name" style={{ color: '#183629' }}>Akash Enterprises</div><div className="brand-sub" style={{ color: '#87958b' }}>Attendance portal</div></div>
+          </div>
+          <div className="eyebrow">WELCOME BACK</div>
+          <h1>Sign in to your account</h1>
+          <p className="intro">Use the employee ID and password shared by HR.</p>
           <form onSubmit={handleLogin}>
             <div className="field">
-              <label>User ID</label>
-              <input
-                type="text"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                placeholder="e.g. EMP001 or admin"
-                required
-                autoComplete="username"
-              />
+              <label htmlFor="userId">Employee ID</label>
+              <input id="userId" value={userId} onChange={e => setUserId(e.target.value)} placeholder="e.g. AE001" autoComplete="username" required />
             </div>
-
             <div className="field">
-              <label>Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                autoComplete="current-password"
-              />
+              <label htmlFor="password">Password</label>
+              <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required />
             </div>
-
-            {error && <div className="status error">{error}</div>}
-
-            <button type="submit" className="btn btn-primary mt-2" disabled={loading}>
-              {loading ? 'Signing in…' : 'Sign In'}
-            </button>
+            {error && <div className="notice notice-error">{error}</div>}
+            <button className="button button-primary" type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign in securely  →'}</button>
           </form>
+          <p style={{ color: '#9aa59e', fontSize: 11, textAlign: 'center', marginTop: 22 }}>Your access is managed by Akash Enterprises HR.</p>
         </div>
-
-        <p className="center muted mt-2" style={{ fontSize: '0.8rem' }}>
-          Credentials are provided by HR / Admin
-        </p>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
