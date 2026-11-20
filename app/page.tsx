@@ -50,7 +50,15 @@ export default function LoginPage() {
       router.replace('/change-password');
       return;
     }
-    router.replace(profile.role === 'employee' || profile.role === 'site_manager' ? '/employee' : '/admin');
+    if (['hr_manager', 'technical_super_admin'].includes(profile.role)) {
+      router.replace('/admin');
+    } else if (['employee', 'site_manager'].includes(profile.role)) {
+      router.replace('/employee');
+    } else {
+      await supabase.auth.signOut();
+      setError('This account does not have portal access. Please contact HR.');
+      setLoading(false);
+    }
   }
 
   if (checking) return <div className="loading-screen">Preparing your workspace…</div>;
