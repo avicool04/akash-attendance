@@ -45,7 +45,7 @@ export default function EmployeePage() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><div className="brand-mark">A</div><div><div className="brand-name">AKASH ENTERPRISES</div><div className="brand-sub">Workforce portal</div></div></div>
+        <div className="brand"><div><div className="brand-name">AKASH ENTERPRISES</div><div className="brand-sub">Workforce portal</div></div></div>
         <div className="nav-label">MY WORKSPACE</div>
         <a className="nav-link active" href="/employee"><span className="nav-icon">▦</span> My overview</a>
         <div className="sidebar-bottom">
@@ -54,7 +54,7 @@ export default function EmployeePage() {
         </div>
       </aside>
       <main className="main-area">
-        <header className="topbar"><div className="mobile-brand"><div className="brand-mark" style={{ width: 32, height: 32, borderRadius: 10 }}>A</div><strong style={{ font: '800 12px Manrope' }}>AKASH ENTERPRISES</strong></div><div className="crumb">My workspace <span style={{ color: '#bdc7c0', margin: '0 8px' }}>/</span> Overview</div><div className="topbar-right"><span className="top-date">{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium'}).format(new Date())}</span><button className="button button-secondary top-logout" onClick={async () => { await supabase.auth.signOut(); router.replace('/'); router.refresh(); }}>Log out ↗</button></div></header>
+        <header className="topbar"><div className="mobile-brand"><strong style={{ font: '800 12px Manrope' }}>AKASH ENTERPRISES</strong></div><div className="crumb">My workspace <span style={{ color: '#bdc7c0', margin: '0 8px' }}>/</span> Overview</div><div className="topbar-right"><span className="top-date">{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium'}).format(new Date())}</span><button className="button button-secondary top-logout" onClick={async () => { await supabase.auth.signOut(); router.replace('/'); router.refresh(); }}>Log out ↗</button></div></header>
         <div className="content">
           <div className="page-heading"><div><div className="eyebrow">EMPLOYEE WORKSPACE</div><h1>My workspace</h1><p>Your assigned work location and employee details.</p></div><span className="pill pill-active">Account active</span></div>
           <section className="stats-grid" style={{ gridTemplateColumns: 'repeat(2,minmax(0,1fr))' }}>
