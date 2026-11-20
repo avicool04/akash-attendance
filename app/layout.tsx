@@ -2,15 +2,13 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Akash Enterprises – Attendance',
-  description: 'Employee attendance system with GPS and selfie verification',
+  title: 'Akash Enterprises | Workforce Portal',
+  description: 'Workforce management and attendance portal for Akash Enterprises.',
+  applicationName: 'Akash Attendance',
+  themeColor: '#12271f',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>{children}</body>
