@@ -58,7 +58,7 @@ export default function LoginPage() {
       router.replace('/change-password');
       return;
     }
-    if (['hr_manager', 'technical_super_admin'].includes(profile.role)) {
+    if (['hr_manager', 'technical_super_admin', 'proprietor'].includes(profile.role)) {
       router.replace('/admin');
     } else if (['employee', 'site_manager'].includes(profile.role)) {
       router.replace('/employee');
