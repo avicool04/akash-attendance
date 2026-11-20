@@ -274,3 +274,6 @@ h1 { color:#1e2340; font-size:clamp(24px,2.5vw,30px); letter-spacing:-.9px; }
   .top-logout { min-height:34px; font-size:11px; padding:7px 10px; }
   .crumb { display:none; }
 }
+
+/* Do not present the temporary letter badge as the official company logo. */
+.brand-mark { display:none !important; }
