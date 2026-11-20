@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 type Place = { place_id: number; display_name: string; lat: string; lon: string };
-type LeafletMap = { setView: (point: [number, number], zoom: number) => LeafletMap; on: (event: string, callback: (event: { latlng: { lat: number; lng: number } }) => void) => void; remove: () => void };
+type LeafletMap = { setView: (point: [number, number], zoom: number) => LeafletMap; on: (event: string, callback: (event: { latlng: { lat: number; lng: number } }) => void) => void; remove: () => void; invalidateSize?: () => void };
 type LeafletMarker = { setLatLng: (point: [number, number]) => LeafletMarker; addTo: (map: LeafletMap) => LeafletMarker };
 type LeafletApi = { map: (element: HTMLElement, options: object) => LeafletMap; tileLayer: (url: string, options: object) => { addTo: (map: LeafletMap) => void }; marker: (point: [number, number]) => LeafletMarker };
 declare global { interface Window { L?: LeafletApi } }
