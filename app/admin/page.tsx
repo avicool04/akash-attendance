@@ -3,19 +3,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import LocationMapPicker from '@/components/LocationMapPicker';
 
 type Location = {
   id: string; name: string; location_type: 'office' | 'site'; address: string | null;
   latitude: number; longitude: number; site_manager_id: string | null; is_active: boolean;
 };
 type Employee = {
-  id: string; employee_code: string | null; full_name: string; designation: string | null;
+  id: string; employee_code: string | null; full_name: string; first_name?: string | null; middle_name?: string | null; last_name?: string | null; designation: string | null;
   role: string; status: string; base_location_id: string | null;
 };
 type FormState = {
   name: string; location_type: 'office' | 'site'; address: string;
   latitude: string; longitude: string; site_manager_id: string;
 };
+const blankEmployee = { first_name: '', middle_name: '', last_name: '', designation: '', role: 'employee', base_location_id: '', reporting_manager_code: '' };
+const employeeName = (e: Employee) => [e.first_name, e.middle_name, e.last_name].filter(Boolean).join(' ').trim() || e.full_name;
 const blankForm: FormState = { name: '', location_type: 'site', address: '', latitude: '', longitude: '', site_manager_id: '' };
 
 export default function AdminPage() {
@@ -25,6 +28,7 @@ export default function AdminPage() {
   const [userId, setUserId] = useState('');
   const [locations, setLocations] = useState<Location[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeForm, setEmployeeForm] = useState(blankEmployee);
   const [form, setForm] = useState<FormState>(blankForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState('');
@@ -51,7 +55,7 @@ export default function AdminPage() {
         .select('id,name,location_type,address,latitude,longitude,site_manager_id,is_active')
         .order('created_at', { ascending: false }),
       supabase.from('profiles')
-        .select('id,employee_code,full_name,designation,role,status,base_location_id')
+        .select('id,employee_code,full_name,first_name,middle_name,last_name,designation,role,status,base_location_id')
         .in('role', ['employee', 'site_manager'])
         .order('full_name'),
     ]);
@@ -69,6 +73,17 @@ export default function AdminPage() {
   const unassignedCount = employees.length - assignedCount;
   const managerOptions = employees.filter(e => e.role === 'site_manager' && e.status === 'active');
 
+  const updateEmployee = (key: keyof typeof blankEmployee, value: string) => setEmployeeForm(current => ({ ...current, [key]: value }));
+  const onMapSelect = useCallback((place: { address: string; latitude: number; longitude: number }) => {
+    setForm(current => ({ ...current, address: place.address, latitude: String(place.latitude), longitude: String(place.longitude) }));
+  }, []);
+  async function createEmployee(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setSaving(true); setError(''); setMessage('');
+    const { data, error: invokeError } = await supabase.functions.invoke('hr-user-admin', { body: { action: 'create', employee: employeeForm } });
+    if (invokeError || data?.error) setError(data?.error || invokeError?.message || 'Could not create employee.');
+    else { setMessage('Employee created. User ID: ' + data.user_id + '. Initial password: ' + data.user_id + '. It must be changed at first sign-in.'); setEmployeeForm(blankEmployee); await loadData(); }
+    setSaving(false);
+  }
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm(current => ({ ...current, [key]: value }));
   }
@@ -166,12 +181,12 @@ export default function AdminPage() {
         <header className="topbar">
           <div className="mobile-brand"><div className="brand-mark" style={{ width: 32, height: 32, borderRadius: 10 }}>A</div><strong style={{ font: '800 12px Manrope' }}>AKASH ENTERPRISES</strong></div>
           <div className="crumb">Workspace <span style={{ color: '#bdc7c0', margin: '0 8px' }}>/</span> HR overview</div>
-          <div className="topbar-right"><span className="top-date">{new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date())}</span><div className="icon-circle">♙</div></div>
+          <div className="topbar-right"><span className="top-date">{new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date())}</span><button className="button button-secondary top-logout" onClick={async () => { await supabase.auth.signOut(); router.replace('/'); router.refresh(); }}>Log out ↗</button></div>
         </header>
 
         <div className="content">
           <div className="page-heading">
-            <div><div className="eyebrow">HR CONTROL CENTRE</div><h1>Good day, {userName.split(' ')[0]}.</h1><p>Manage your workforce, offices and project locations from one place.</p></div>
+            <div><div className="eyebrow">HR CONTROL CENTRE</div><h1>Workforce dashboard</h1><p>Manage your workforce, offices and project locations from one place.</p></div>
             {canManage && <button className="button button-primary" onClick={() => { resetForm(); document.getElementById('location-form')?.scrollIntoView({ behavior: 'smooth' }); }}>＋ Add location</button>}
           </div>
 
@@ -185,6 +200,22 @@ export default function AdminPage() {
             <div className="stat-card"><div className="stat-top">Awaiting assignment <span className="stat-icon">＋</span></div><div className="stat-value">{unassignedCount}</div><div className="stat-foot">Active employees without a base location</div></div>
           </section>
 
+          {canManage && <section className="panel employee-create-panel" id="employees">
+            <div className="panel-head"><div><h2 className="panel-title">Create employee account</h2><p className="panel-subtitle">Employee details, base location and reporting manager</p></div><span className="pill pill-active">HR only</span></div>
+            <div className="panel-body"><form onSubmit={createEmployee}>
+              <div className="form-grid three-cols">
+                <div className="field"><label>First name *</label><input required value={employeeForm.first_name} onChange={e=>updateEmployee('first_name',e.target.value)} /></div>
+                <div className="field"><label>Middle name</label><input value={employeeForm.middle_name} onChange={e=>updateEmployee('middle_name',e.target.value)} /></div>
+                <div className="field"><label>Last name *</label><input required value={employeeForm.last_name} onChange={e=>updateEmployee('last_name',e.target.value)} /></div>
+                <div className="field"><label>Designation *</label><input required value={employeeForm.designation} onChange={e=>updateEmployee('designation',e.target.value)} placeholder="e.g. Site Engineer" /></div>
+                <div className="field"><label>Role</label><select value={employeeForm.role} onChange={e=>updateEmployee('role',e.target.value)}><option value="employee">Employee</option><option value="site_manager">Site Manager</option></select></div>
+                <div className="field"><label>Base location</label><select value={employeeForm.base_location_id} onChange={e=>updateEmployee('base_location_id',e.target.value)}><option value="">Not assigned yet</option>{locations.filter(l=>l.is_active).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select><button type="button" className="inline-action" onClick={()=>document.getElementById('location-form')?.scrollIntoView({behavior:'smooth'})}>＋ Add New Location</button></div>
+                <div className="field"><label>Reporting manager</label><select value={employeeForm.reporting_manager_code} onChange={e=>updateEmployee('reporting_manager_code',e.target.value)}><option value="">Not assigned</option>{employees.filter(m=>m.status==='active' && ['site_manager','hr_manager','technical_super_admin'].includes(m.role)).map(m=><option key={m.id} value={m.employee_code||''}>{employeeName(m)} · {m.employee_code}</option>)}</select></div>
+              </div>
+              <p className="form-note">Employee ID is generated automatically. Initial password matches the Employee ID and must be changed on first login.</p>
+              <button className="button button-primary" type="submit" disabled={saving}>{saving?'Creating…':'Create employee'}</button>
+            </form></div>
+          </section>}
           <section className="location-layout" id="locations">
             <div className="panel">
               <div className="panel-head"><div><h2 className="panel-title">Office & site locations</h2><p className="panel-subtitle">Your organisation's registered work locations</p></div><span className="pill pill-active">{activeLocations} active</span></div>
@@ -197,7 +228,7 @@ export default function AdminPage() {
                     <div className="location-info">
                       <div className="location-name">{location.name}</div>
                       <div className="location-meta">{location.address || 'Address not added'} · {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</div>
-                      {manager && <div className="location-meta">Site manager: {manager.full_name}</div>}
+                      {manager && <div className="location-meta">Site manager: {employeeName(manager)}</div>}
                     </div>
                     <div className="location-right">
                       <span className={'pill ' + (location.location_type === 'office' ? 'pill-office' : 'pill-site')}>{location.location_type === 'office' ? 'Office' : 'Site'}</span>
@@ -217,12 +248,9 @@ export default function AdminPage() {
                   <div className="field"><label>Location name *</label><input value={form.name} onChange={e => updateForm('name', e.target.value)} placeholder="e.g. Bhubaneswar Head Office" required maxLength={120} /></div>
                   <div className="field"><label>Location type *</label><select value={form.location_type} onChange={e => updateForm('location_type', e.target.value as 'office' | 'site')}><option value="site">Project Site</option><option value="office">Office</option></select></div>
                   <div className="field"><label>Address</label><input value={form.address} onChange={e => updateForm('address', e.target.value)} placeholder="Street, city, state" maxLength={300} /></div>
-                  <div className="form-grid">
-                    <div className="field"><label>Latitude *</label><input value={form.latitude} onChange={e => updateForm('latitude', e.target.value)} placeholder="20.2961" inputMode="decimal" required /></div>
-                    <div className="field"><label>Longitude *</label><input value={form.longitude} onChange={e => updateForm('longitude', e.target.value)} placeholder="85.8245" inputMode="decimal" required /></div>
-                  </div>
-                  <button className="button button-secondary" type="button" style={{ width: '100%', marginBottom: 14 }} onClick={useCurrentLocation} disabled={locating}>{locating ? 'Getting GPS…' : '◎ Use my current GPS location'}</button>
-                  <div className="field"><label>Site manager</label><select value={form.site_manager_id} onChange={e => updateForm('site_manager_id', e.target.value)}><option value="">Not assigned</option>{managerOptions.map(m => <option key={m.id} value={m.id}>{m.full_name}{m.employee_code ? ' · ' + m.employee_code : ''}</option>)}</select></div>
+                  <LocationMapPicker onSelect={onMapSelect} />
+                  <p className="form-note">Latitude and longitude are captured automatically from the selected map point.</p>
+                  <div className="field"><label>Site manager</label><select value={form.site_manager_id} onChange={e => updateForm('site_manager_id', e.target.value)}><option value="">Not assigned</option>{managerOptions.map(m => <option key={m.id} value={m.id}>{employeeName(m)}{m.employee_code ? ' · ' + m.employee_code : ''}</option>)}</select></div>
                   <p className="form-note">GPS coordinates identify the registered work location. Employee punch coordinates will be recorded separately; this setting does not create a geofence restriction.</p>
                   <div className="form-actions"><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editingId ? 'Save changes' : 'Create location'}</button>{editingId && <button className="button button-secondary" type="button" onClick={resetForm}>Cancel</button>}</div>
                 </form>
@@ -234,7 +262,7 @@ export default function AdminPage() {
             <div className="panel-head"><div><h2 className="panel-title">Employee location assignment</h2><p className="panel-subtitle">Set or change each employee's designated base location</p></div><span className="pill pill-active">{assignedCount} assigned</span></div>
             <div className="panel-body">
               <form className="assign-controls" onSubmit={assignLocation}>
-                <div className="field"><label>Employee</label><select value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} required><option value="">Choose employee</option>{employees.filter(e => e.status === 'active').map(e => <option key={e.id} value={e.id}>{e.full_name}{e.employee_code ? ' · ' + e.employee_code : ''}</option>)}</select></div>
+                <div className="field"><label>Employee</label><select value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} required><option value="">Choose employee</option>{employees.filter(e => e.status === 'active').map(e => <option key={e.id} value={e.id}>{employeeName(e)}{e.employee_code ? ' · ' + e.employee_code : ''}</option>)}</select></div>
                 <div className="field"><label>Assign to location</label><select value={selectedLocation} onChange={e => setSelectedLocation(e.target.value)}><option value="">No location / Unassign</option>{locations.filter(l => l.is_active).map(l => <option key={l.id} value={l.id}>{l.name} ({l.location_type})</option>)}</select></div>
                 <button className="button button-primary" type="submit" disabled={saving || !selectedEmployee}>{saving ? 'Saving…' : 'Save assignment'}</button>
               </form>
@@ -244,7 +272,7 @@ export default function AdminPage() {
                 {employees.map(employee => {
                   const location = locations.find(l => l.id === employee.base_location_id);
                   return <tr key={employee.id}>
-                    <td><div className="employee-name">{employee.full_name}</div><div className="employee-code">{employee.employee_code || employee.role.replace('_',' ')}</div></td>
+                    <td><div className="employee-name">{employeeName(employee)}</div><div className="employee-code">{employee.employee_code || employee.role.replace('_',' ')}</div></td>
                     <td>{employee.designation || (employee.role === 'site_manager' ? 'Site Manager' : '—')}</td>
                     <td>{location ? location.name : <span style={{ color: '#b17a32' }}>Not assigned</span>}</td>
                     <td><span className={'pill ' + (employee.status === 'active' ? 'pill-active' : 'pill-inactive')}>{employee.status}</span></td>
